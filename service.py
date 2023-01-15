@@ -47,6 +47,21 @@ yolo_v5_runner = bentoml.Runner(yolov5runnable, max_batch_size=30)
 svc = bentoml.Service("yolo_v5", runners=[yolo_v5_runner])
 
 
+def get_length_width(row):
+    xmin = row['xmin']
+    ymin = row['ymin']
+    xmax = row['xmax']
+    ymax = row['ymax']
+
+    WIDTH_PIXELS_PER_M = 548.571
+    LENGTH_PIXELS_PER_M = 510
+
+    row['width'] = (xmax - xmin) / WIDTH_PIXELS_PER_M
+    row['length'] = (ymax - ymin) / LENGTH_PIXELS_PER_M
+
+    return row
+
+
 @svc.api(input=JSON(), output=JSON())
 def invocation(input_dict):
     """
@@ -117,7 +132,8 @@ def invocation(input_dict):
         basename = os.path.basename(file)
         batch_ret = yolo_v5_runner.inference.run(file)
         df = batch_ret.pandas().xyxy[0]
-
+        
+        df = df.apply(get_length_width, axis=1)
         df["filename"] = basename
         predictions_dict.extend(df.to_dict("records"))
 
